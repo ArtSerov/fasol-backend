@@ -7,5 +7,6 @@ admin.site.register(Product)
 admin.site.register(BasketProduct)
 admin.site.register(Basket)
 admin.site.register(Customer)
+admin.site.register(Order)
 
 

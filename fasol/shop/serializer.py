@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Category, Subcategory, Product, Basket, BasketProduct
+from .models import Category, Subcategory, Product, Basket, BasketProduct, Order
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -81,3 +81,15 @@ class ChangeQTYBasketProductSerializer(serializers.ModelSerializer):
     class Meta:
         model = BasketProduct
         fields = ("id", "action")
+
+
+class OrderCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Order
+        exclude = ("customer", "basket", "status", "order_date")
+
+
+class OrderSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Order
+        fields = "__all__"

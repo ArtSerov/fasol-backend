@@ -1,7 +1,7 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-
+from .utils import recalculation_basket
 from .serializer import (
     CategorySerializer,
     SubcategorySerializer,
@@ -11,8 +11,11 @@ from .serializer import (
     ProductCreateSerializer,
     BasketSerializer,
     AddToBasketSerializer,
-    ChangeQTYBasketProductSerializer)
-from .models import Category, Subcategory, Product, Basket, Customer, BasketProduct
+    ChangeQTYBasketProductSerializer,
+    OrderCreateSerializer,
+    OrderSerializer,
+)
+from .models import Category, Subcategory, Product, Basket, Customer, BasketProduct, Order
 from .mixins import BasketMixin
 
 
@@ -64,7 +67,7 @@ class AddToBasketView(BasketMixin, viewsets.ModelViewSet):
         )
         if created:
             self.basket.products.add(basket_product)
-            self.basket.save()
+            recalculation_basket(self.basket)
             return Response("Товар добавлен в корзину!")
         return Response("Товар уже есть в корзине!")
 
@@ -83,7 +86,7 @@ class ChangeProductQTYView(BasketMixin, viewsets.ModelViewSet):
             print(basket_product.quantity)
             basket_product.quantity -= 1
         basket_product.save()
-        self.basket.save()
+        recalculation_basket(self.basket)
         return Response("Количество тавара изменено!")
 
 
@@ -98,5 +101,34 @@ class DeleteFromBasketView(BasketMixin, viewsets.ModelViewSet):
         )
         self.basket.products.remove(basket_product)
         basket_product.delete()
-        self.basket.save()
+        recalculation_basket(self.basket)
         return Response("Товар удален из корзины!")
+
+
+class OrderView(viewsets.ModelViewSet):
+    serializer_class = OrderSerializer
+    queryset = Order.objects.all()
+
+
+class OrderCreateView(BasketMixin, viewsets.ModelViewSet):
+    serializer_class = OrderCreateSerializer
+
+    @action(detail=True, methods=['post'])
+    def create(self, request, *args, **kwargs):
+        customer = Customer.objects.get(user=request.user)
+        new_order = Order.objects.create(
+            customer=customer,
+            first_name=request.data.get('first_name'),
+            last_name=request.data.get('last_name'),
+            phone=request.data.get('phone'),
+            address=request.data.get('address'),
+            buying_type=request.data.get('buying_type'),
+            comment=request.data.get('comment')
+        )
+        new_order.save()
+        self.basket.in_order = True
+        self.basket.save()
+        new_order.basket = self.basket
+        new_order.save()
+        customer.orders.add(new_order)
+        return Response("Заказ успешно оформлен!")

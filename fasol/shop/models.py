@@ -70,18 +70,6 @@ class Basket(models.Model):
     in_order = models.BooleanField(default=False)
     for_anonymous_user = models.BooleanField(default=False)
 
-    def save(self, *args, **kwargs):
-        basket_data = self.products.aggregate(models.Sum("total_price"), models.Sum("quantity"))
-        if basket_data['total_price__sum']:
-            self.total_price = basket_data['total_price__sum']
-        else:
-            self.total_price = 0
-        if basket_data["quantity__sum"]:
-            self.total_products = basket_data["quantity__sum"]
-        else:
-            self.total_products = 0
-        super().save(*args, **kwargs)
-
 
 class Customer(models.Model):
     user = models.ForeignKey(User, verbose_name='Покупатель', on_delete=models.CASCADE)
@@ -118,6 +106,7 @@ class Order(models.Model):
         verbose_name='Покупатель',
         related_name='related_orders',
         on_delete=models.CASCADE)
+    basket = models.ForeignKey(Basket, verbose_name='Корзина', on_delete=models.CASCADE, null=True, blank=True)
     first_name = models.CharField(max_length=255, verbose_name='Имя')
     last_name = models.CharField(max_length=255, verbose_name='Фамилия')
     phone = models.CharField(max_length=20, verbose_name='Телефон')

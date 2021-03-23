@@ -7,7 +7,9 @@ from .views import (
     BasketView,
     AddToBasketView,
     DeleteFromBasketView,
-    ChangeProductQTYView
+    ChangeProductQTYView,
+    OrderCreateView,
+    OrderView,
 )
 
 
@@ -32,7 +34,13 @@ products_detail = ProductView.as_view({
     'patch': 'partial_update',
     'delete': 'destroy'
 })
-basket = BasketView.as_view({
+baskets = BasketView.as_view({
+    'get': 'retrieve',
+})
+orders_list = OrderView.as_view({
+    'get': 'list'
+})
+orders_detail = OrderView.as_view({
     'get': 'retrieve',
 })
 
@@ -42,8 +50,11 @@ urlpatterns = format_suffix_patterns([
     path('subcategories/', subcategories, name="subcategories"),
     path('products/', products_list, name="products_list"),
     path('products/<int:pk>', products_detail, name="products_detail"),
-    path('basket/', basket, name="basket"),
+    path('orders/', orders_list, name="products_list"),
+    path('orders/<int:pk>', orders_detail, name="products_detail"),
+    path('basket/', baskets, name="basket"),
     path('add-to-basket/', AddToBasketView.as_view({'post': 'create'}), name="add_to_basket"),
     path('remove-from-basket/', DeleteFromBasketView.as_view({'post': 'destroy'}), name="remove_from_basket"),
-    path('change-product-qty/', ChangeProductQTYView.as_view({'post': 'change_qty'}), name="change-product-qty/")
+    path('change-product-qty/', ChangeProductQTYView.as_view({'post': 'change_qty'}), name="change_product_qty/"),
+    path('order-create/', OrderCreateView.as_view({'post': 'create'}), name="order_create"),
 ])
