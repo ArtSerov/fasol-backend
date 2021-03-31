@@ -1,5 +1,6 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
+from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.response import Response
 from .utils import recalculation_basket
 from .serializer import (
@@ -20,6 +21,7 @@ from .mixins import BasketMixin
 
 
 class CategoriesView(viewsets.ModelViewSet):
+    """Вывод списка категорий"""
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
 
@@ -28,7 +30,6 @@ class SubcategoriesView(viewsets.ModelViewSet):
     queryset = Subcategory.objects.all()
 
     def get_serializer_class(self):
-        print(self.action)
         if self.action == 'list':
             return SubcategorySerializer
         if self.action == 'create':
@@ -37,9 +38,11 @@ class SubcategoriesView(viewsets.ModelViewSet):
 
 class ProductView(viewsets.ModelViewSet):
     queryset = Product.objects.all()
+    filter_backends = [SearchFilter, OrderingFilter]
+    search_fields = ['name', 'subcategory__name']
+    ordering_fields = ['price', 'name']
 
     def get_serializer_class(self):
-        print(self.request)
         if self.action == 'list':
             return ProductListSerializer
         if self.action == 'retrieve':
@@ -60,7 +63,7 @@ class AddToBasketView(BasketMixin, viewsets.ModelViewSet):
     serializer_class = AddToBasketSerializer
 
     @action(detail=True, methods=['post'])
-    def create(self, request, *args, **kwargs):
+    def add_to_basket(self, request, *args, **kwargs):
         product = Product.objects.get(id=request.data.get('id'))
         basket_product, created = BasketProduct.objects.get_or_create(
             user=self.basket.owner, basket=self.basket, product=product
@@ -83,7 +86,6 @@ class ChangeProductQTYView(BasketMixin, viewsets.ModelViewSet):
         if request.data.get('action') == "addition":
             basket_product.quantity += 1
         elif request.data.get('action') == 'subtraction' and basket_product.quantity != 1:
-            print(basket_product.quantity)
             basket_product.quantity -= 1
         basket_product.save()
         recalculation_basket(self.basket)
@@ -106,8 +108,14 @@ class DeleteFromBasketView(BasketMixin, viewsets.ModelViewSet):
 
 
 class OrderView(viewsets.ModelViewSet):
-    serializer_class = OrderSerializer
     queryset = Order.objects.all()
+    serializer_class = OrderSerializer
+    # @action(detail=True, methods=['get'])
+    # def order_for_user(self, request, *args, **kwargs):
+    #     customer = Customer.objects.get(user=request.user)
+    #     order = Order.objects.all()
+    #     serializer = OrderSerializer(order)
+    #     return Response(serializer.data)
 
 
 class OrderCreateView(BasketMixin, viewsets.ModelViewSet):
