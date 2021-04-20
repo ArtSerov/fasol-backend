@@ -1,14 +1,12 @@
 from django.db import models
-from django.contrib.auth import get_user_model
 from django.urls import reverse
 
-User = get_user_model()
+import users.models
 
 
 class Category(models.Model):
     name = models.CharField(max_length=255, verbose_name='Имя категории')
     representation = models.ImageField(upload_to="сategory/", null=True, blank=True, verbose_name='Изображение')
-    # slug = models.SlugField(unique=True)
 
     def __str__(self):
         return self.name
@@ -21,7 +19,6 @@ class Subcategory(models.Model):
                                  related_name='related_category')
 
     name = models.CharField(max_length=255, verbose_name='Имя подкатегории')
-    # slug = models.SlugField(unique=True)
 
     def __str__(self):
         return self.name
@@ -43,7 +40,7 @@ class Product(models.Model):
 
 
 class BasketProduct(models.Model):
-    user = models.ForeignKey('Customer', verbose_name='Покупатель', on_delete=models.CASCADE)
+    user = models.ForeignKey(users.models.CustomUser, verbose_name='Покупатель', on_delete=models.CASCADE)
     basket = models.ForeignKey(
         'Basket', verbose_name='Корзина',
         on_delete=models.CASCADE,
@@ -62,23 +59,13 @@ class BasketProduct(models.Model):
 
 
 class Basket(models.Model):
-    owner = models.ForeignKey('Customer', null=True, verbose_name='Покупатель', on_delete=models.CASCADE)
+    owner = models.ForeignKey(users.models.CustomUser, null=True, verbose_name='Покупатель', on_delete=models.CASCADE)
     products = models.ManyToManyField(BasketProduct, blank=True, related_name='related_basket')
 
-    total_products = models.PositiveIntegerField(default=0,)
+    total_products = models.PositiveIntegerField(default=0, )
     total_price = models.DecimalField(max_digits=9, decimal_places=2, default=0, verbose_name='Итого')
     in_order = models.BooleanField(default=False)
     for_anonymous_user = models.BooleanField(default=False)
-
-
-class Customer(models.Model):
-    user = models.ForeignKey(User, verbose_name='Покупатель', on_delete=models.CASCADE)
-    orders = models.ManyToManyField('Order', verbose_name='Заказы', related_name='related_customer')
-    phone = models.CharField(max_length=12, verbose_name='Мобильный телефон', null=True, blank=True)
-    address = models.CharField(max_length=255, verbose_name='Адрес', null=True, blank=True)
-
-    def __str__(self):
-        return f"Покупатель {self.phone}"
 
 
 class Order(models.Model):
@@ -102,7 +89,7 @@ class Order(models.Model):
     )
 
     customer = models.ForeignKey(
-        Customer,
+        users.models.CustomUser,
         verbose_name='Покупатель',
         related_name='related_orders',
         on_delete=models.CASCADE)

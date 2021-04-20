@@ -1,6 +1,7 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter, OrderingFilter
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from .utils import recalculation_basket
 from .serializer import (
@@ -16,7 +17,8 @@ from .serializer import (
     OrderCreateSerializer,
     OrderSerializer,
 )
-from .models import Category, Subcategory, Product, Basket, Customer, BasketProduct, Order
+from .models import Category, Subcategory, Product, Basket, BasketProduct, Order
+from users.models import CustomUser
 from .mixins import BasketMixin
 
 
@@ -108,14 +110,11 @@ class DeleteFromBasketView(BasketMixin, viewsets.ModelViewSet):
 
 
 class OrderView(viewsets.ModelViewSet):
-    queryset = Order.objects.all()
     serializer_class = OrderSerializer
-    # @action(detail=True, methods=['get'])
-    # def order_for_user(self, request, *args, **kwargs):
-    #     customer = Customer.objects.get(user=request.user)
-    #     order = Order.objects.all()
-    #     serializer = OrderSerializer(order)
-    #     return Response(serializer.data)
+
+    def get_queryset(self):
+        customer = CustomUser.objects.get(user=self.request.user)
+        return Order.objects.filter(customer=customer)
 
 
 class OrderCreateView(BasketMixin, viewsets.ModelViewSet):
@@ -123,7 +122,7 @@ class OrderCreateView(BasketMixin, viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def create(self, request, *args, **kwargs):
-        customer = Customer.objects.get(user=request.user)
+        customer = CustomUser.objects.get(user=request.user)
         new_order = Order.objects.create(
             customer=customer,
             first_name=request.data.get('first_name'),
@@ -140,3 +139,4 @@ class OrderCreateView(BasketMixin, viewsets.ModelViewSet):
         new_order.save()
         customer.orders.add(new_order)
         return Response("Заказ успешно оформлен!")
+

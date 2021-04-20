@@ -1,15 +1,16 @@
 from django.views.generic import View
 
-from .models import Customer, Basket
+from .models import Basket
+from users.models import CustomUser
 
 
 class BasketMixin(View):
 
     def dispatch(self, request, *args, **kwargs):
         if request.user.is_authenticated:
-            customer = Customer.objects.filter(user=request.user).first()
+            customer = CustomUser.objects.filter(user=request.user).first()
             if not customer:
-                customer = Customer.objects.create(
+                customer = CustomUser.objects.create(
                     user=request.user
                 )
             basket = Basket.objects.filter(owner=customer, in_order=False).first()

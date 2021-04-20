@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from .models import Category, Subcategory, Product, Basket, BasketProduct, Order
-
+from users.models import CustomUser
 
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
@@ -93,3 +93,4 @@ class OrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = "__all__"
+
