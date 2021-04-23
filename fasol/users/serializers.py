@@ -1,3 +1,5 @@
+from abc import ABC
+
 from rest_framework import serializers
 from .models import CustomUser
 
@@ -36,3 +38,26 @@ class CustomUserSerializer(serializers.ModelSerializer):
             instance.set_password(password)
         instance.save()
         return instance
+
+
+class ResetPasswordPhoneSerializer(serializers.Serializer):
+    phone = serializers.CharField(max_length=20)
+
+
+class ResetPasswordVerificationCodeSerializer(serializers.Serializer):
+    number = serializers.CharField(max_length=5)
+
+
+class NewPasswordSerializer(serializers.Serializer):
+    password = serializers.CharField(
+        max_length=128,
+        min_length=8,
+        write_only=True
+    )
+    confirm_password = serializers.CharField(
+        max_length=128,
+        min_length=8,
+        write_only=True
+    )
+    code = serializers.CharField(max_length=5)
+    user_id = serializers.CharField(max_length=255)

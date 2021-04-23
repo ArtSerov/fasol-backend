@@ -1,6 +1,7 @@
 from django.db import models
 from django.utils import timezone
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
+import random
 
 
 class CustomAccountManager(BaseUserManager):
@@ -17,7 +18,7 @@ class CustomAccountManager(BaseUserManager):
 
         return self.create_user(phone, user_name, password, **other_fields)
 
-    def create_user(self, phone, user_name,  password, **other_fields):
+    def create_user(self, phone, user_name, password, **other_fields):
         user = self.model(phone=phone, user_name=user_name, **other_fields)
         user.set_password(password)
         user.save()
@@ -42,3 +43,24 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return f"Покупатель {self.phone}"
+
+
+class Code(models.Model):
+    number = models.CharField(max_length=5, blank=True)
+    creation_date = models.DateTimeField(default=timezone.now)
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return str(self.number)
+
+    def save(self, *args, **kwargs):
+        number_list = [x for x in range(10)]
+        code_items = []
+
+        for i in range(5):
+            num = random.choice(number_list)
+            code_items.append(num)
+        code_string = "".join(str(item) for item in code_items)
+        self.number = code_string
+        self.creation_date = timezone.now()
+        super().save(*args, **kwargs)
