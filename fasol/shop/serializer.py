@@ -3,6 +3,7 @@ from rest_framework import serializers
 from .models import Category, Subcategory, Product, Basket, BasketProduct, Order
 from users.models import CustomUser
 
+
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
@@ -42,8 +43,11 @@ class ProductDetailSerializer(serializers.ModelSerializer):
 
 
 class ProductCreateSerializer(serializers.ModelSerializer):
-    subcategory = serializers.SlugRelatedField(slug_field="id", queryset=Subcategory.objects, many=False,
-                                               read_only=False)
+    subcategory = serializers.SlugRelatedField(slug_field="id",
+                                               queryset=Subcategory.objects,
+                                               many=False,
+                                               read_only=False,
+                                               )
 
     class Meta:
         model = Product
@@ -93,4 +97,3 @@ class OrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = "__all__"
-
