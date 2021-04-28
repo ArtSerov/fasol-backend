@@ -1,3 +1,4 @@
+from django.core.validators import RegexValidator
 from django.db import models
 from django.utils import timezone
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
@@ -26,7 +27,11 @@ class CustomAccountManager(BaseUserManager):
 
 
 class CustomUser(AbstractBaseUser, PermissionsMixin):
-    phone = models.CharField(max_length=12, verbose_name='Мобильный телефон', unique=True)
+    phone_regex = RegexValidator(
+        regex=r'^8\d{10}$',
+        message="Phone number must be entered in the format: '8 xxx xxx xx xx'. Up to 11 digits allowed."
+    )
+    phone = models.CharField(validators=[phone_regex], max_length=12, verbose_name='Мобильный телефон', unique=True)
     user_name = models.CharField(max_length=150, unique=True, blank=True, null=True)
     first_name = models.CharField(max_length=150, verbose_name='Имя', null=True, blank=True)
     last_name = models.CharField(max_length=150, verbose_name='Фамилия', null=True, blank=True)

@@ -71,7 +71,7 @@ class BasketSerializer(serializers.ModelSerializer):
 
 
 class AddToBasketSerializer(serializers.ModelSerializer):
-    id = serializers.IntegerField(read_only=False)
+    id = serializers.IntegerField(label="product_id", read_only=False)
 
     class Meta:
         model = Product

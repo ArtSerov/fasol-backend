@@ -3,6 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
 from rest_framework.response import Response
+from django.core.exceptions import ObjectDoesNotExist
 from .utils import recalculation_basket
 from .serializer import (
     CategorySerializer,
@@ -15,11 +16,11 @@ from .serializer import (
     AddToBasketSerializer,
     ChangeQTYBasketProductSerializer,
     OrderCreateSerializer,
-    OrderSerializer,
+    OrderSerializer, BasketProductSerializer,
 )
 from .models import Category, Subcategory, Product, Basket, BasketProduct, Order
 from users.models import CustomUser
-from .mixins import BasketMixin, ViewSetActionPermissionMixin
+from .mixins import ViewSetActionPermissionMixin
 
 
 class CategoriesView(ViewSetActionPermissionMixin, viewsets.ModelViewSet):
@@ -27,12 +28,12 @@ class CategoriesView(ViewSetActionPermissionMixin, viewsets.ModelViewSet):
     serializer_class = CategorySerializer
 
     permission_action_classes = {
-        'create': [IsAdminUser],
-        'list': [AllowAny],
+        'list': [IsAuthenticated],
         'retrieve': [AllowAny],
-        'update': [IsAdminUser],
+        # 'create': [IsAdminUser],
+        # 'update': [IsAdminUser],
         'destroy': [IsAdminUser],
-        'partial_update': [IsAdminUser]
+        # 'partial_update': [IsAdminUser]
     }
 
 
@@ -40,19 +41,18 @@ class SubcategoriesView(ViewSetActionPermissionMixin, viewsets.ModelViewSet):
     queryset = Subcategory.objects.all()
 
     permission_action_classes = {
-        'create': [IsAdminUser],
         'list': [AllowAny],
         'retrieve': [AllowAny],
-        'update': [IsAdminUser],
-        'destroy': [IsAdminUser],
-        'partial_update': [IsAdminUser]
+        # 'create': [IsAdminUser],
+        # 'update': [IsAdminUser],
+        # 'destroy': [IsAdminUser],
+        # 'partial_update': [IsAdminUser]
     }
 
     def get_serializer_class(self):
-        if self.action == 'list':
-            return SubcategorySerializer
         if self.action == 'create':
             return SubcategoryCreateSerializer
+        return SubcategorySerializer
 
 
 class ProductView(ViewSetActionPermissionMixin, viewsets.ModelViewSet):
@@ -64,10 +64,10 @@ class ProductView(ViewSetActionPermissionMixin, viewsets.ModelViewSet):
     permission_action_classes = {
         'list': [AllowAny],
         'retrieve': [AllowAny],
-        'create': [IsAdminUser],
-        'update': [IsAdminUser],
-        'destroy': [IsAdminUser],
-        'partial_update': [IsAdminUser]
+        # 'create': [IsAdminUser],
+        # 'update': [IsAdminUser],
+        # 'destroy': [IsAdminUser],
+        # 'partial_update': [IsAdminUser]
     }
 
     def get_serializer_class(self):
@@ -79,93 +79,148 @@ class ProductView(ViewSetActionPermissionMixin, viewsets.ModelViewSet):
             return ProductCreateSerializer
 
 
-class BasketView(BasketMixin, viewsets.ModelViewSet):
-    permission_classes = IsAuthenticated
+class BasketView(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
 
     @action(detail=True)
     def retrieve(self, request, *args, **kwargs):
-        serializer = BasketSerializer(self.basket)
+        customer = CustomUser.objects.filter(phone=request.user.phone).first()
+        basket = Basket.objects.filter(owner=customer, in_order=False).first()
+        serializer = BasketSerializer(basket)
         return Response(serializer.data)
 
 
-class AddToBasketView(BasketMixin, viewsets.ModelViewSet):
+class AddToBasketView(viewsets.ModelViewSet):
     serializer_class = AddToBasketSerializer
-    permission_classes = IsAuthenticated
+    permission_classes = [IsAuthenticated, ]
 
     @action(detail=True, methods=['post'])
     def add_to_basket(self, request, *args, **kwargs):
-        product = Product.objects.get(id=request.data.get('id'))
-        basket_product, created = BasketProduct.objects.get_or_create(
-            user=self.basket.owner, basket=self.basket, product=product
-        )
-        if created:
-            self.basket.products.add(basket_product)
-            recalculation_basket(self.basket)
-            return Response({'message': "The product was successfully added to the basket!"}, status=status.HTTP_201_CREATED)
-        return Response({'message': "The product is already existing in the basket!"}, status=status.HTTP_200_OK)
+
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid(raise_exception=True):
+            customer = CustomUser.objects.filter(phone=request.user.phone).first()
+            basket = Basket.objects.filter(owner=customer, in_order=False).first()
+            if not basket:
+                basket = Basket.objects.create(owner=customer)
+
+            try:
+                product = Product.objects.get(id=request.data.get('id'))
+            except ObjectDoesNotExist:
+                return Response({"error": f"объект с id={request.data.get('id')} не найдет!"},
+                                status=status.HTTP_400_BAD_REQUEST)
+
+            basket_product, created = BasketProduct.objects.get_or_create(
+                user=basket.owner, basket=basket, product=product
+            )
+            if created:
+                basket.products.add(basket_product)
+                recalculation_basket(basket)
+                return Response({
+                    'message': "This product was successfully added to this basket!",
+                    'basket_product': BasketProductSerializer(basket_product,
+                                                              context=self.get_serializer_context()).data
+                }, status=status.HTTP_201_CREATED)
+            return Response({'message': "The product is already existing in the basket!"}, status=status.HTTP_200_OK)
 
 
-class ChangeProductQTYView(BasketMixin, viewsets.ModelViewSet):
+class ChangeProductQTYView(viewsets.ModelViewSet):
     serializer_class = ChangeQTYBasketProductSerializer
-    permission_classes = IsAuthenticated
+    permission_classes = [IsAuthenticated, ]
 
     @action(detail=True, methods=['post'])
     def change_qty(self, request, *args, **kwargs):
-        basket_product = BasketProduct.objects.get(
-            id=request.data.get('id'), user=self.basket.owner, basket=self.basket,
-        )
-        if request.data.get('action') == "addition":
-            basket_product.quantity += 1
-        elif request.data.get('action') == 'subtraction' and basket_product.quantity != 1:
-            basket_product.quantity -= 1
-        basket_product.save()
-        recalculation_basket(self.basket)
-        return Response({'message': "The product quantity has been changed!"}, status=status.HTTP_200_OK)
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid(raise_exception=True):
+
+            customer = CustomUser.objects.filter(phone=request.user.phone).first()
+            basket = Basket.objects.filter(owner=customer, in_order=False).first()
+
+            try:
+                basket_product = BasketProduct.objects.get(id=request.data.get('id'), user=basket.owner, basket=basket)
+            except ObjectDoesNotExist:
+                return Response({"error": f"Объект с id={request.data.get('id')} не найдет!"},
+                                status=status.HTTP_400_BAD_REQUEST)
+            if request.data.get('action') == "addition":
+                basket_product.quantity += 1
+            elif request.data.get('action') == "subtraction":
+                if basket_product.quantity == 1:
+                    basket.products.remove(basket_product)
+                basket_product.quantity -= 1
+            else:
+                return Response({"error": f"Неверное значение в поле action. Ожидалось 'addition' или 'subtraction'"},
+                                status=status.HTTP_400_BAD_REQUEST)
+
+            basket_product.save()
+            recalculation_basket(basket)
+            return Response({'message': "The product quantity has been changed!"}, status=status.HTTP_200_OK)
 
 
-class DeleteFromBasketView(BasketMixin, viewsets.ModelViewSet):
+class DeleteFromBasketView(viewsets.ModelViewSet):
     serializer_class = AddToBasketSerializer
-    ermission_classes = IsAuthenticated
+    permission_classes = [IsAuthenticated, ]
 
     @action(detail=True, methods=['post'])
     def destroy(self, request, *args, **kwargs):
-        product = Product.objects.get(id=request.data.get('id'))
-        basket_product = BasketProduct.objects.get(
-            user=self.basket.owner, basket=self.basket, product=product
-        )
-        self.basket.products.remove(basket_product)
-        basket_product.delete()
-        recalculation_basket(self.basket)
-        return Response({'message': "The product was successfully removed from the basket!"}, status=status.HTTP_200_OK)
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid(raise_exception=True):
+            customer = CustomUser.objects.filter(phone=request.user.phone).first()
+            basket = Basket.objects.filter(owner=customer, in_order=False).first()
+
+            basket_product = BasketProduct.objects.get(
+                user=basket.owner, basket=basket, product=request.data.get('id')
+            )
+            basket.products.remove(basket_product)
+            basket_product.delete()
+            recalculation_basket(basket)
+            return Response({'message': "The product was successfully removed from the basket!"}, status=status.HTTP_200_OK)
 
 
-class OrderView(viewsets.ModelViewSet):
+class OrderView(ViewSetActionPermissionMixin, viewsets.ModelViewSet):
     serializer_class = OrderSerializer
 
+    permission_action_classes = {
+        'list': [IsAdminUser],
+        'retrieve': [IsAuthenticated],
+        # 'create': [IsAdminUser],
+        # 'update': [IsAdminUser],
+        # 'destroy': [IsAdminUser],
+        # 'partial_update': [IsAdminUser]
+    }
+
     def get_queryset(self):
-        customer = CustomUser.objects.get(user=self.request.user)
-        return Order.objects.filter(customer=customer)
+        if self.action == 'list':
+            return Order.objects.all()
+        if self.action == 'retrieve':
+            if self.request.user.is_staff:
+                return Order.objects.all()
+            customer = self.request.user
+            return Order.objects.filter(customer=customer)
 
 
-class OrderCreateView(BasketMixin, viewsets.ModelViewSet):
+class OrderCreateView(viewsets.ModelViewSet):
     serializer_class = OrderCreateSerializer
+    permission_classes = [IsAuthenticated, ]
 
     @action(detail=True, methods=['post'])
     def create(self, request, *args, **kwargs):
-        customer = CustomUser.objects.get(user=request.user)
-        new_order = Order.objects.create(
-            customer=customer,
-            first_name=request.data.get('first_name'),
-            last_name=request.data.get('last_name'),
-            phone=request.data.get('phone'),
-            address=request.data.get('address'),
-            buying_type=request.data.get('buying_type'),
-            comment=request.data.get('comment')
-        )
-        new_order.save()
-        self.basket.in_order = True
-        self.basket.save()
-        new_order.basket = self.basket
-        new_order.save()
-        customer.orders.add(new_order)
-        return Response("Заказ успешно оформлен!")
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid(raise_exception=True):
+            customer = CustomUser.objects.get(phone=request.user.phone)
+            basket = Basket.objects.filter(owner=customer, in_order=False).first()
+            new_order = Order.objects.create(
+                customer=customer,
+                first_name=request.data.get('first_name'),
+                last_name=request.data.get('last_name'),
+                phone=request.data.get('phone'),
+                address=request.data.get('address'),
+                buying_type=request.data.get('buying_type'),
+                comment=request.data.get('comment')
+            )
+            new_order.save()
+            basket.in_order = True
+            basket.save()
+            new_order.basket = basket
+            new_order.save()
+            customer.orders.add(new_order)
+            return Response("Заказ успешно оформлен!")

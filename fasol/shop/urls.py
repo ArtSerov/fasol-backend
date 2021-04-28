@@ -68,11 +68,10 @@ urlpatterns = format_suffix_patterns([
 
     path('orders/', orders_list, name="order_list"),
     path('orders/<int:pk>', orders_detail, name="order_detail"),
+    path('order-create/', OrderCreateView.as_view({'post': 'create'}), name="order_create"),
 
     path('basket/', baskets, name="basket"),
     path('add-to-basket/', AddToBasketView.as_view({'post': 'add_to_basket'}), name="add_to_basket"),
     path('remove-from-basket/', DeleteFromBasketView.as_view({'post': 'destroy'}), name="remove_from_basket"),
     path('change-product-qty/', ChangeProductQTYView.as_view({'post': 'change_qty'}), name="change_product_qty/"),
-
-    path('order-create/', OrderCreateView.as_view({'post': 'create'}), name="order_create"),
 ])
