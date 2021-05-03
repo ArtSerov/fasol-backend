@@ -97,3 +97,9 @@ class OrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = "__all__"
+
+
+class OrderStatusChangingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Order
+        fields = ("id", "status")

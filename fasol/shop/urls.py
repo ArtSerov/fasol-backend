@@ -9,9 +9,8 @@ from .views import (
     DeleteFromBasketView,
     ChangeProductQTYView,
     OrderCreateView,
-    OrderView,
+    OrderView, ChangingOrderStatusView,
 )
-
 
 categories_list = CategoriesView.as_view({
     'get': 'list',
@@ -55,7 +54,6 @@ orders_detail = OrderView.as_view({
     'get': 'retrieve',
 })
 
-
 urlpatterns = format_suffix_patterns([
     path('categories/', categories_list, name="categories_list"),
     path('categories/<int:pk>', categories_detail, name="categories_detail"),
@@ -69,6 +67,8 @@ urlpatterns = format_suffix_patterns([
     path('orders/', orders_list, name="order_list"),
     path('orders/<int:pk>', orders_detail, name="order_detail"),
     path('order-create/', OrderCreateView.as_view({'post': 'create'}), name="order_create"),
+    path('change-order-status/', ChangingOrderStatusView.as_view({'post': 'change_status'}),
+         name="order_status_changing"),
 
     path('basket/', baskets, name="basket"),
     path('add-to-basket/', AddToBasketView.as_view({'post': 'add_to_basket'}), name="add_to_basket"),

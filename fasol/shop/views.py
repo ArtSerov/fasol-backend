@@ -16,7 +16,9 @@ from .serializer import (
     AddToBasketSerializer,
     ChangeQTYBasketProductSerializer,
     OrderCreateSerializer,
-    OrderSerializer, BasketProductSerializer,
+    OrderSerializer,
+    BasketProductSerializer,
+    OrderStatusChangingSerializer
 )
 from .models import Category, Subcategory, Product, Basket, BasketProduct, Order
 from users.models import CustomUser
@@ -107,7 +109,7 @@ class AddToBasketView(viewsets.ModelViewSet):
             try:
                 product = Product.objects.get(id=request.data.get('id'))
             except ObjectDoesNotExist:
-                return Response({"error": f"объект с id={request.data.get('id')} не найдет!"},
+                return Response({"error": f"объект с id={request.data.get('id')} не найден!"},
                                 status=status.HTTP_400_BAD_REQUEST)
 
             basket_product, created = BasketProduct.objects.get_or_create(
@@ -139,7 +141,7 @@ class ChangeProductQTYView(viewsets.ModelViewSet):
             try:
                 basket_product = BasketProduct.objects.get(id=request.data.get('id'), user=basket.owner, basket=basket)
             except ObjectDoesNotExist:
-                return Response({"error": f"Объект с id={request.data.get('id')} не найдет!"},
+                return Response({"error": f"Объект с id={request.data.get('id')} не найден!"},
                                 status=status.HTTP_400_BAD_REQUEST)
             if request.data.get('action') == "addition":
                 basket_product.quantity += 1
@@ -173,29 +175,19 @@ class DeleteFromBasketView(viewsets.ModelViewSet):
             basket.products.remove(basket_product)
             basket_product.delete()
             recalculation_basket(basket)
-            return Response({'message': "The product was successfully removed from the basket!"}, status=status.HTTP_200_OK)
+            return Response({'message': "The product was successfully removed from the basket!"},
+                            status=status.HTTP_200_OK)
 
 
 class OrderView(ViewSetActionPermissionMixin, viewsets.ModelViewSet):
     serializer_class = OrderSerializer
-
-    permission_action_classes = {
-        'list': [IsAdminUser],
-        'retrieve': [IsAuthenticated],
-        # 'create': [IsAdminUser],
-        # 'update': [IsAdminUser],
-        # 'destroy': [IsAdminUser],
-        # 'partial_update': [IsAdminUser]
-    }
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        if self.action == 'list':
+        if self.request.user.is_staff:
             return Order.objects.all()
-        if self.action == 'retrieve':
-            if self.request.user.is_staff:
-                return Order.objects.all()
-            customer = self.request.user
-            return Order.objects.filter(customer=customer)
+        else:
+            return Order.objects.filter(customer=self.request.user)
 
 
 class OrderCreateView(viewsets.ModelViewSet):
@@ -224,3 +216,25 @@ class OrderCreateView(viewsets.ModelViewSet):
             new_order.save()
             customer.orders.add(new_order)
             return Response("Заказ успешно оформлен!")
+
+
+class ChangingOrderStatusView(viewsets.ModelViewSet):
+    serializer_class = OrderStatusChangingSerializer
+
+    @action(detail=True, methods=['post'], permission_classes=IsAuthenticated)
+    def change_status(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        print(serializer.is_valid())
+        if serializer.is_valid(raise_exception=True):
+            try:
+                if request.user.is_staff:
+                    order = Order.objects.get(id=request.data.get("id"))
+                else:
+                    order = Order.objects.filter(customer=request.user, id=request.data.get("id")).first()
+                order.status = request.data.get("status")
+                order.save()
+                return Response({'message': OrderSerializer(order, context=self.get_serializer_context()).data},
+                                status=status.HTTP_200_OK)
+            except AttributeError:
+                return Response({"error": f"Объект не найден!"},
+                                status=status.HTTP_400_BAD_REQUEST)
